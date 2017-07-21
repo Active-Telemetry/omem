@@ -62,7 +62,7 @@ void omstats(om_block * om)
     size_t i, j;
 
     om_meta *bp = (om_meta *) om->base;
-    while ((size_t) bp < (om->base + om->size)) {
+    while ((size_t) bp < ((size_t) om->base + om->size)) {
         size_t size = BLK_SIZE(bp);
         if (BLK_FREE(bp)) {
             free += size;
@@ -108,7 +108,7 @@ size_t omavailable(om_block * om)
 {
     size_t free = 0;
     om_meta *bp = (om_meta *) om->base;
-    while ((size_t) bp < (om->base + om->size)) {
+    while ((size_t) bp < ((size_t) om->base + om->size)) {
         if (BLK_FREE(bp))
             free += BLK_SIZE(bp);
         bp = BLK_NEXT(bp);
@@ -121,23 +121,23 @@ size_t omavailable(om_block * om)
 static void *coalesce(om_block * om, om_meta * bp)
 {
     /* Check if there is a previous block */
-    if (om->base < (size_t) bp) {
+    if ((size_t) om->base < (size_t) bp) {
         om_meta *prev = BLK_PREV(bp);
 
         /* Check if the previous block is free */
         if (BLK_FREE(prev)) {
             BLK_SET(prev, BLK_SIZE(prev) + BLK_SIZE(bp), 0);
-            if (om->next == ((size_t) bp - om->base))
-                om->next = (size_t) prev - om->base;
+            if (om->next == ((size_t) bp - (size_t) om->base))
+                om->next = (size_t) prev - (size_t) om->base;
             bp = prev;
         }
     }
 
     /* Check if there is a next block that is free */
     om_meta *next = BLK_NEXT(bp);
-    if ((size_t) next < (om->base + om->size) && BLK_FREE(next)) {
-        if (om->next == ((size_t) next - om->base))
-            om->next = (size_t) bp - om->base;
+    if ((size_t) next < ((size_t) om->base + om->size) && BLK_FREE(next)) {
+        if (om->next == ((size_t) next - (size_t) om->base))
+            om->next = (size_t) bp - (size_t) om->base;
         BLK_SET(bp, BLK_SIZE(bp) + BLK_SIZE(next), false);
     }
     return bp;
@@ -153,7 +153,7 @@ static void *find_fit(om_block * om, size_t size)
     while (1) {
         if (checked >= om->size)
             break;
-        if ((size_t) bp >= (om->base + om->size))
+        if ((size_t) bp >= ((size_t) om->base + om->size))
             bp = (om_meta *) om->base;
         if (BLK_FREE(bp) && BLK_SIZE(bp) >= size)
             return bp;
@@ -163,14 +163,13 @@ static void *find_fit(om_block * om, size_t size)
     return NULL;
 }
 
-void ominit(om_block * om, size_t base, size_t size)
+void ominit(om_block * om, size_t size)
 {
     om_meta *bp;
 
-    om->base = base;
     om->size = size;
-    memset((void *) base, 0, om->size);
-    bp = (om_meta *) base;
+    memset((void *) om->base, 0, om->size);
+    bp = (om_meta *) om->base;
     BLK_SET(bp, size, false);
     om->next = 0;
     return;
@@ -191,7 +190,7 @@ void *omalloc(om_block * om, size_t size)
         assert(bp && "om_block exhausted");
         return 0;
     }
-    om->next = (size_t) bp - om->base;
+    om->next = (size_t) bp - (size_t) om->base;
 
     if (blk_size < BLK_SIZE(bp) && (BLK_SIZE(bp) - blk_size) > BLK_MIN_SIZE) {
         om_meta *next = (om_meta *) ((uint8_t *) bp + blk_size);

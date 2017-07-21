@@ -56,13 +56,12 @@ void DEBUG_NEXT_BLOCK(void *ptr)
 #endif
 
 #define TEST_HEAP_SIZE (8 * 1024 * 1024)
-static uint8_t *theheap = NULL;
-static om_block omm = { };
+static om_block *omm;
 
 int suite_init(void)
 {
-    theheap = malloc(TEST_HEAP_SIZE);
-    ominit(&omm, (size_t) theheap, TEST_HEAP_SIZE);
+    omm = (om_block *) malloc(sizeof(om_block) + TEST_HEAP_SIZE);
+    ominit(omm, TEST_HEAP_SIZE);
     return 0;
 }
 
@@ -73,48 +72,48 @@ int suite_shutdown(void)
 
 void test_malloc_0()
 {
-    CU_ASSERT(omalloc(&omm, 0) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omalloc(omm, 0) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_free_null()
 {
-    omfree(&omm, 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    omfree(omm, 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc1()
 {
     void *m;
-    CU_ASSERT((m = omalloc(&omm, 1)) != 0);
+    CU_ASSERT((m = omalloc(omm, 1)) != 0);
     // DEBUG_BLOCK(m);
     // DEBUG_NEXT_BLOCK(m);
-    omfree(&omm, m);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    omfree(omm, m);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc_twice()
 {
     void *m1, *m2;
-    CU_ASSERT((m1 = omalloc(&omm, 1)) != 0);
+    CU_ASSERT((m1 = omalloc(omm, 1)) != 0);
     // DEBUG_BLOCK(m1);
-    CU_ASSERT((m2 = omalloc(&omm, 2)) != 0);
+    CU_ASSERT((m2 = omalloc(omm, 2)) != 0);
     // DEBUG_BLOCK(m2);
     // DEBUG_NEXT_BLOCK(m2);
-    omfree(&omm, m2);
+    omfree(omm, m2);
     // DEBUG_BLOCK(m2);
-    omfree(&omm, m1);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    omfree(omm, m1);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc_twice_reverse()
 {
     void *m1, *m2;
-    CU_ASSERT((m1 = omalloc(&omm, 1)) != 0);
-    CU_ASSERT((m2 = omalloc(&omm, 2)) != 0);
-    omfree(&omm, m1);
-    omfree(&omm, m2);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT((m1 = omalloc(omm, 1)) != 0);
+    CU_ASSERT((m2 = omalloc(omm, 2)) != 0);
+    omfree(omm, m1);
+    omfree(omm, m2);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc_until_fail()
@@ -123,16 +122,16 @@ void test_malloc_until_fail()
     GList *iter;
     while (1) {
         size_t size = rand() % ((16 * 1024) - (2 * 2 * sizeof(size_t)));
-        if (omavailable(&omm) < size)
+        if (omavailable(omm) < size)
             break;
-        void *m = omalloc(&omm, size);
+        void *m = omalloc(omm, size);
         mlist = g_list_prepend(mlist, m);
     }
-    omstats(&omm);
+    omstats(omm);
     for (iter = mlist; iter; iter = g_list_next(iter))
-        omfree(&omm, iter->data);
+        omfree(omm, iter->data);
     g_list_free(mlist);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc_performance()
@@ -144,14 +143,14 @@ void test_malloc_performance()
 
     start = get_time_us();
     for (i = 0; i < TEST_ITERATIONS_BIG; i++) {
-        allocated = g_list_prepend(allocated, omalloc(&omm, 8));
+        allocated = g_list_prepend(allocated, omalloc(omm, 8));
     }
     for (iter = allocated; iter; iter = iter->next) {
-        omfree(&omm, iter->data);
+        omfree(omm, iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     g_list_free(allocated);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_glib_malloc_performance()
@@ -181,8 +180,8 @@ void test_malloc_performance_fragmented()
     int i;
 
     for (i = 0; i < (TEST_HEAP_SIZE / 50); i += 64) {
-        fragments = g_list_prepend(fragments, omalloc(&omm, 64));
-        omfree(&omm, omalloc(&omm, 64));
+        fragments = g_list_prepend(fragments, omalloc(omm, 64));
+        omfree(omm, omalloc(omm, 64));
     }
     start = get_time_us();
     for (i = 0; i < TEST_ITERATIONS_BIG; i++) {
@@ -194,10 +193,10 @@ void test_malloc_performance_fragmented()
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     g_list_free(allocated);
     for (iter = fragments; iter; iter = iter->next) {
-        omfree(&omm, iter->data);
+        omfree(omm, iter->data);
     }
     g_list_free(fragments);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 typedef struct list_entry {
@@ -208,7 +207,7 @@ typedef struct list_entry {
 static list_entry *list_entry_new(char *str)
 {
     int size = sizeof(list_entry) + strlen(str) + 1;
-    list_entry *e = omalloc(&omm, size);
+    list_entry *e = omalloc(omm, size);
     memset(e, 0, size);
     strcpy(e->str, str);
     return e;
@@ -216,7 +215,7 @@ static list_entry *list_entry_new(char *str)
 
 static void list_entry_free(list_entry * e)
 {
-    omfree(&omm, e);
+    omfree(omm, e);
 }
 
 static bool list_entry_find(omlistentry * e, void *data)
@@ -231,24 +230,24 @@ static int list_entry_cmp(omlistentry * e1, omlistentry * e2)
 
 void test_list_add_remove()
 {
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e)) != 0);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e)) != 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_remove_not_there()
 {
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_prepend()
@@ -256,16 +255,16 @@ void test_list_prepend()
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
     list_entry *e1 = list_entry_new("dummy1");
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e)) != 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e1);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e)) != 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e1);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e1);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_append()
@@ -273,16 +272,16 @@ void test_list_append()
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
     list_entry *e1 = list_entry_new("dummy1");
-    CU_ASSERT((thelist = omlist_append(omm.base, thelist, (omlistentry *) e)) != 0);
-    CU_ASSERT((thelist = omlist_append(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e1);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_append(omm, thelist, (omlistentry *) e)) != 0);
+    CU_ASSERT((thelist = omlist_append(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e1);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e1);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_length()
@@ -291,24 +290,24 @@ void test_list_length()
     list_entry *e1 = list_entry_new("dummy1");
     list_entry *e2 = list_entry_new("dummy2");
     list_entry *e3 = list_entry_new("dummy3");
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 1);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e2)) != 0);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 2);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e3)) != 0);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 3);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 2);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e2);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 1);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e3);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT(omlist_length(omm, thelist) == 1);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e2)) != 0);
+    CU_ASSERT(omlist_length(omm, thelist) == 2);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e3)) != 0);
+    CU_ASSERT(omlist_length(omm, thelist) == 3);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e1);
+    CU_ASSERT(omlist_length(omm, thelist) == 2);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e2);
+    CU_ASSERT(omlist_length(omm, thelist) == 1);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e3);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
     list_entry_free(e1);
     list_entry_free(e2);
     list_entry_free(e3);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_get()
@@ -316,18 +315,18 @@ void test_list_get()
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
     list_entry *e1 = list_entry_new("dummy1");
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e)) != 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e1);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e);
-    CU_ASSERT(omlist_get(omm.base, thelist, 2) == NULL);
-    CU_ASSERT(omlist_get(omm.base, thelist, -1) == NULL);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e)) != 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e1);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e);
+    CU_ASSERT(omlist_get(omm, thelist, 2) == NULL);
+    CU_ASSERT(omlist_get(omm, thelist, -1) == NULL);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e1);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_reverse()
@@ -335,19 +334,19 @@ void test_list_reverse()
     omlist thelist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
     list_entry *e1 = list_entry_new("dummy1");
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e)) != 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e1);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e);
-    thelist = omlist_reverse(omm.base, thelist);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e1);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT((thelist = omlist_remove(omm.base, thelist, (omlistentry *) e)) == 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e)) != 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e1);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e);
+    thelist = omlist_reverse(omm, thelist);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e1);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT((thelist = omlist_remove(omm, thelist, (omlistentry *) e)) == 0);
     list_entry_free(e1);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_concat()
@@ -356,17 +355,17 @@ void test_list_concat()
     omlist theotherlist = OMLIST_INIT;
     list_entry *e = list_entry_new("dummy");
     list_entry *e1 = list_entry_new("dummy1");
-    thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e);
-    theotherlist = omlist_prepend(omm.base, theotherlist, (omlistentry *) e1);
-    CU_ASSERT((thelist = omlist_concat(omm.base, thelist, theotherlist)) != 0);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e1);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e);
+    thelist = omlist_prepend(omm, thelist, (omlistentry *) e);
+    theotherlist = omlist_prepend(omm, theotherlist, (omlistentry *) e1);
+    CU_ASSERT((thelist = omlist_concat(omm, thelist, theotherlist)) != 0);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e1);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e1);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e);
     list_entry_free(e1);
     list_entry_free(e);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_find()
@@ -375,24 +374,24 @@ void test_list_find()
     list_entry *e1 = list_entry_new("dummy1");
     list_entry *e2 = list_entry_new("dummy2");
     list_entry *e3 = list_entry_new("dummy3");
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1)) != 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e2)) != 0);
-    CU_ASSERT((thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e3)) != 0);
-    CU_ASSERT(omlist_find(omm.base, thelist, list_entry_find, "dummy") == NULL);
-    CU_ASSERT(omlist_find(omm.base, thelist, list_entry_find, "dummy1") ==
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e1)) != 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e2)) != 0);
+    CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e3)) != 0);
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy") == NULL);
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy1") ==
               (omlistentry *) e1);
-    CU_ASSERT(omlist_find(omm.base, thelist, list_entry_find, "dummy2") ==
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy2") ==
               (omlistentry *) e2);
-    CU_ASSERT(omlist_find(omm.base, thelist, list_entry_find, "dummy3") ==
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy3") ==
               (omlistentry *) e3);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e2);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e3);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e1);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e2);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e3);
     list_entry_free(e1);
     list_entry_free(e2);
     list_entry_free(e3);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_sort()
@@ -401,21 +400,21 @@ void test_list_sort()
     list_entry *e1 = list_entry_new("abc");
     list_entry *e2 = list_entry_new("def");
     list_entry *e3 = list_entry_new("123");
-    thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e1);
-    thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e2);
-    thelist = omlist_prepend(omm.base, thelist, (omlistentry *) e3);
-    thelist = omlist_sort(omm.base, thelist, list_entry_cmp);
-    CU_ASSERT(omlist_get(omm.base, thelist, 0) == (omlistentry *) e3);
-    CU_ASSERT(omlist_get(omm.base, thelist, 1) == (omlistentry *) e1);
-    CU_ASSERT(omlist_get(omm.base, thelist, 2) == (omlistentry *) e2);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e1);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e2);
-    thelist = omlist_remove(omm.base, thelist, (omlistentry *) e3);
+    thelist = omlist_prepend(omm, thelist, (omlistentry *) e1);
+    thelist = omlist_prepend(omm, thelist, (omlistentry *) e2);
+    thelist = omlist_prepend(omm, thelist, (omlistentry *) e3);
+    thelist = omlist_sort(omm, thelist, list_entry_cmp);
+    CU_ASSERT(omlist_get(omm, thelist, 0) == (omlistentry *) e3);
+    CU_ASSERT(omlist_get(omm, thelist, 1) == (omlistentry *) e1);
+    CU_ASSERT(omlist_get(omm, thelist, 2) == (omlistentry *) e2);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e1);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e2);
+    thelist = omlist_remove(omm, thelist, (omlistentry *) e3);
     list_entry_free(e1);
     list_entry_free(e2);
     list_entry_free(e3);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_prepend_performance()
@@ -432,18 +431,18 @@ void test_list_prepend_performance()
     }
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        thelist = omlist_prepend(omm.base, thelist, (omlistentry *) iter->data);
+        thelist = omlist_prepend(omm, thelist, (omlistentry *) iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
-    CU_ASSERT(omlist_length(omm.base, thelist) == TEST_ITERATIONS);
+    CU_ASSERT(omlist_length(omm, thelist) == TEST_ITERATIONS);
     entries = g_list_reverse(entries);
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        thelist = omlist_remove(omm.base, thelist, (omlistentry *) iter->data);
+        thelist = omlist_remove(omm, thelist, (omlistentry *) iter->data);
         list_entry_free((list_entry *) iter->data);
     }
     g_list_free(entries);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_list_append_performance()
@@ -460,17 +459,17 @@ void test_list_append_performance()
     }
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        thelist = omlist_append(omm.base, thelist, (omlistentry *) iter->data);
+        thelist = omlist_append(omm, thelist, (omlistentry *) iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
-    CU_ASSERT(omlist_length(omm.base, thelist) == TEST_ITERATIONS);
+    CU_ASSERT(omlist_length(omm, thelist) == TEST_ITERATIONS);
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        thelist = omlist_remove(omm.base, thelist, (omlistentry *) iter->data);
+        thelist = omlist_remove(omm, thelist, (omlistentry *) iter->data);
         list_entry_free((list_entry *) iter->data);
     }
     g_list_free(entries);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_glist_append_performance()
@@ -510,23 +509,23 @@ void test_list_find_performance()
         list_entry *e = list_entry_new(s);
         free(s);
         entries = g_list_prepend(entries, e);
-        thelist = omlist_append(omm.base, thelist, (omlistentry *) e);
+        thelist = omlist_append(omm, thelist, (omlistentry *) e);
     }
     entries = g_list_reverse(entries);
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
         list_entry *e = (list_entry *) iter->data;
-        CU_ASSERT(omlist_find(omm.base, thelist, list_entry_find, e->str) != NULL);
+        CU_ASSERT(omlist_find(omm, thelist, list_entry_find, e->str) != NULL);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start) / TEST_ITERATIONS);
-    CU_ASSERT(omlist_length(omm.base, thelist) == TEST_ITERATIONS);
+    CU_ASSERT(omlist_length(omm, thelist) == TEST_ITERATIONS);
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        thelist = omlist_remove(omm.base, thelist, (omlistentry *) iter->data);
+        thelist = omlist_remove(omm, thelist, (omlistentry *) iter->data);
         list_entry_free((list_entry *) iter->data);
     }
     g_list_free(entries);
-    CU_ASSERT(omlist_length(omm.base, thelist) == 0);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omlist_length(omm, thelist) == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_glist_find_performance()
@@ -565,7 +564,7 @@ typedef struct htable_entry {
 static htable_entry *htable_entry_new(char *str)
 {
     int size = sizeof(htable_entry) + strlen(str) + 1;
-    htable_entry *e = omalloc(&omm, size);
+    htable_entry *e = omalloc(omm, size);
     memset(e, 0, size);
     strcpy(e->str, str);
     return e;
@@ -573,7 +572,7 @@ static htable_entry *htable_entry_new(char *str)
 
 static void htable_entry_free(htable_entry * e)
 {
-    omfree(&omm, e);
+    omfree(omm, e);
 }
 
 static bool htable_entry_cmp(htable_entry * e, char *str)
@@ -583,7 +582,7 @@ static bool htable_entry_cmp(htable_entry * e, char *str)
 
 static omhtable *create_table(int buckets)
 {
-    omhtable *table = (omhtable *) omalloc(&omm, OMHTABLE_SIZE(buckets));
+    omhtable *table = (omhtable *) omalloc(omm, OMHTABLE_SIZE(buckets));
     memset(table, 0, OMHTABLE_SIZE(buckets));
     table->size = buckets;
     return table;
@@ -591,19 +590,19 @@ static omhtable *create_table(int buckets)
 
 static void destroy_table(omhtable * table)
 {
-    omfree(&omm, table);
+    omfree(omm, table);
 }
 
 void test_htable_add_delete()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_size()
@@ -612,61 +611,61 @@ void test_htable_size()
     htable_entry *e1 = htable_entry_new("dummy1");
     htable_entry *e2 = htable_entry_new("dummy2");
     htable_entry *e3 = htable_entry_new("dummy3");
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e1);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 1);
-    omhtable_add(omm.base, htable, 1, (omhtentry *) e2);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 2);
-    omhtable_add(omm.base, htable, 1, (omhtentry *) e3);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 3);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e1);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 2);
-    omhtable_delete(omm.base, htable, 1, (omhtentry *) e2);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 1);
-    omhtable_delete(omm.base, htable, 1, (omhtentry *) e3);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
+    omhtable_add(omm, htable, 0, (omhtentry *) e1);
+    CU_ASSERT(omhtable_size(omm, htable) == 1);
+    omhtable_add(omm, htable, 1, (omhtentry *) e2);
+    CU_ASSERT(omhtable_size(omm, htable) == 2);
+    omhtable_add(omm, htable, 1, (omhtentry *) e3);
+    CU_ASSERT(omhtable_size(omm, htable) == 3);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e1);
+    CU_ASSERT(omhtable_size(omm, htable) == 2);
+    omhtable_delete(omm, htable, 1, (omhtentry *) e2);
+    CU_ASSERT(omhtable_size(omm, htable) == 1);
+    omhtable_delete(omm, htable, 1, (omhtentry *) e3);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     htable_entry_free(e1);
     htable_entry_free(e2);
     htable_entry_free(e3);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_delete_not_there()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_add_already_there()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_add_hash_too_large()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, TEST_HASH_TABLE_SIZE * 2, (omhtentry *) e);
-    omhtable_delete(omm.base, htable, TEST_HASH_TABLE_SIZE * 2, (omhtentry *) e);
+    omhtable_add(omm, htable, TEST_HASH_TABLE_SIZE * 2, (omhtentry *) e);
+    omhtable_delete(omm, htable, TEST_HASH_TABLE_SIZE * 2, (omhtentry *) e);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_add_delete_lots()
@@ -677,19 +676,19 @@ void test_htable_add_delete_lots()
 
     for (i = 0; i < 10000; i++) {
         e = htable_entry_new("dummy");
-        omhtable_add(omm.base, htable, i, (omhtentry *) e);
+        omhtable_add(omm, htable, i, (omhtentry *) e);
     }
-    omhtable_stats(omm.base, htable);
+    omhtable_stats(omm, htable);
     for (i = 0; i < 10000; i++) {
         int offset = 0;
         CU_ASSERT((e =
-                   (htable_entry *) omhtable_get(omm.base, htable, i, &offset)) != NULL);
-        omhtable_delete(omm.base, htable, i, (omhtentry *) e);
+                   (htable_entry *) omhtable_get(omm, htable, i, &offset)) != NULL);
+        omhtable_delete(omm, htable, i, (omhtentry *) e);
         htable_entry_free(e);
     }
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_first()
@@ -697,17 +696,17 @@ void test_htable_find_first()
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
     htable_entry *e1 = htable_entry_new("dummy1");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e1);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e1);
     CU_ASSERT(omhtable_find
-              (omm.base, htable, (omhtable_cmp_fn) htable_entry_cmp, 0, "dummy") != NULL);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e1);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+              (omm, htable, (omhtable_cmp_fn) htable_entry_cmp, 0, "dummy") != NULL);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e1);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     htable_entry_free(e1);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_second()
@@ -715,55 +714,55 @@ void test_htable_find_second()
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
     htable_entry *e1 = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e1);
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e1);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
     CU_ASSERT(omhtable_find
-              (omm.base, htable, (omhtable_cmp_fn) htable_entry_cmp, 0, "dummy") != NULL);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e1);
+              (omm, htable, (omhtable_cmp_fn) htable_entry_cmp, 0, "dummy") != NULL);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e1);
     htable_entry_free(e1);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_wrong_hash()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
     CU_ASSERT(omhtable_find
-              (omm.base, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+              (omm, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_not_there()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     CU_ASSERT(omhtable_find
-              (omm.base, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+              (omm, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_removed()
 {
     omhtable *htable = create_table(TEST_HASH_TABLE_SIZE);
     htable_entry *e = htable_entry_new("dummy");
-    omhtable_add(omm.base, htable, 0, (omhtentry *) e);
-    omhtable_delete(omm.base, htable, 0, (omhtentry *) e);
+    omhtable_add(omm, htable, 0, (omhtentry *) e);
+    omhtable_delete(omm, htable, 0, (omhtentry *) e);
     CU_ASSERT(omhtable_find
-              (omm.base, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
+              (omm, htable, (omhtable_cmp_fn) htable_entry_cmp, 1, "dummy") == NULL);
     htable_entry_free(e);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_add_performance()
@@ -780,17 +779,17 @@ void test_htable_add_performance()
     }
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        omhtable_add(omm.base, htable, i, (omhtentry *) iter->data);
+        omhtable_add(omm, htable, i, (omhtentry *) iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        omhtable_delete(omm.base, htable, i, (omhtentry *) iter->data);
+        omhtable_delete(omm, htable, i, (omhtentry *) iter->data);
         htable_entry_free((htable_entry *) iter->data);
     }
     g_list_free(entries);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_delete_performance()
@@ -807,17 +806,17 @@ void test_htable_delete_performance()
     }
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        omhtable_add(omm.base, htable, i, (omhtentry *) iter->data);
+        omhtable_add(omm, htable, i, (omhtentry *) iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
-        omhtable_delete(omm.base, htable, i, (omhtentry *) iter->data);
+        omhtable_delete(omm, htable, i, (omhtentry *) iter->data);
         htable_entry_free((htable_entry *) iter->data);
     }
     g_list_free(entries);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 bool _htable_find_cmp_fn(omhtentry * e, void *data)
@@ -838,26 +837,26 @@ void _htable_find_performance(size_t buckets, size_t count)
         htable_entry *e = htable_entry_new(s);
         free(s);
         entries = g_list_prepend(entries, e);
-        omhtable_add(omm.base, htable, omhtable_strhash(e->str), (omhtentry *) e);
+        omhtable_add(omm, htable, omhtable_strhash(e->str), (omhtentry *) e);
     }
     entries = g_list_reverse(entries);
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
         htable_entry *e = (htable_entry *) iter->data;
         CU_ASSERT(omhtable_find
-                  (omm.base, htable, _htable_find_cmp_fn, omhtable_strhash(e->str),
+                  (omm, htable, _htable_find_cmp_fn, omhtable_strhash(e->str),
                    e->str) != NULL);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
         htable_entry *e = (htable_entry *) iter->data;
-        omhtable_delete(omm.base, htable, omhtable_strhash(e->str), (omhtentry *) e);
+        omhtable_delete(omm, htable, omhtable_strhash(e->str), (omhtentry *) e);
         htable_entry_free(e);
     }
     g_list_free(entries);
-    CU_ASSERT(omhtable_size(omm.base, htable) == 0);
+    CU_ASSERT(omhtable_size(omm, htable) == 0);
     destroy_table(htable);
-    CU_ASSERT(omavailable(&omm) == TEST_HEAP_SIZE);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htable_find_performance_32buckets()

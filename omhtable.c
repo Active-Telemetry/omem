@@ -27,7 +27,7 @@
 #include "omem.h"
 
 /* Print a pretty histogram of the bucket sizes */
-void omhtable_stats(size_t base, omhtable * ht)
+void omhtable_stats(om_block * om, omhtable * ht)
 {
     size_t *histogram = calloc(1, ht->size * sizeof(size_t));
     omhtentry *e;
@@ -39,7 +39,7 @@ void omhtable_stats(size_t base, omhtable * ht)
 
     for (i = 0; i < ht->size; i++) {
         int offset = 0;
-        while ((e = omhtable_get(base, ht, i, &offset)) != NULL) {
+        while ((e = omhtable_get(om, ht, i, &offset)) != NULL) {
             histogram[i] += 1;
             max_bucket = (i > max_bucket) ? i : max_bucket;
             min_bucket = (i < min_bucket) ? i : min_bucket;
@@ -63,43 +63,43 @@ void omhtable_stats(size_t base, omhtable * ht)
     }
 }
 
-void omhtable_add(size_t base, omhtable * ht, size_t hash, omhtentry * e)
+void omhtable_add(om_block * om, omhtable * ht, size_t hash, omhtentry * e)
 {
     assert(ht && ht->size && e && !e->next);
     hash = hash % ht->size;
-    ht->table[hash] = omlist_prepend(base, ht->table[hash], (omlistentry *) e);
+    ht->table[hash] = omlist_prepend(om, ht->table[hash], (omlistentry *) e);
     return;
 }
 
-void omhtable_delete(size_t base, omhtable * ht, size_t hash, omhtentry * e)
+void omhtable_delete(om_block * om, omhtable * ht, size_t hash, omhtentry * e)
 {
     assert(ht && ht->size && e);
     hash = hash % ht->size;
-    ht->table[hash] = omlist_remove(base, ht->table[hash], (omlistentry *) e);
+    ht->table[hash] = omlist_remove(om, ht->table[hash], (omlistentry *) e);
     return;
 }
 
-size_t omhtable_size(size_t base, omhtable * ht)
+size_t omhtable_size(om_block * om, omhtable * ht)
 {
     assert(ht && ht->size);
     size_t length = 0;
     int i;
     for (i = 0; i < ht->size; i++)
-        length += omlist_length(base, ht->table[i]);
+        length += omlist_length(om, ht->table[i]);
     return length;
 }
 
-omhtentry *omhtable_get(size_t base, omhtable * ht, size_t hash, int *offset)
+omhtentry *omhtable_get(om_block * om, omhtable * ht, size_t hash, int *offset)
 {
     hash = hash % ht->size;
-    return (omhtentry *) omlist_get(base, ht->table[hash], (*offset)++);
+    return (omhtentry *) omlist_get(om, ht->table[hash], (*offset)++);
 }
 
-omhtentry *omhtable_find(size_t base, omhtable * ht, omhtable_cmp_fn cmp, size_t hash,
+omhtentry *omhtable_find(om_block * om, omhtable * ht, omhtable_cmp_fn cmp, size_t hash,
                          void *data)
 {
     hash = hash % ht->size;
-    return (omhtentry *) omlist_find(base, ht->table[hash], (omlist_find_fn) cmp, data);
+    return (omhtentry *) omlist_find(om, ht->table[hash], (omlist_find_fn) cmp, data);
 }
 
 size_t omhtable_strhash(const char *s)
