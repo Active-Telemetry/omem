@@ -61,6 +61,7 @@ void omhtable_stats(om_block * om, omhtable * ht)
             printf(" (%zu)", histogram[i]);
         printf("\n");
     }
+    free(histogram);
 }
 
 void omhtable_add(om_block * om, omhtable * ht, size_t hash, omhtentry * e)

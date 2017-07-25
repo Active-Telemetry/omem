@@ -140,7 +140,8 @@ omlistentry *omlist_find(om_block * om, omlist l, omlist_find_fn func, void *dat
     return NULL;
 }
 
-static omlist omlist_sort_merge(om_block * om, omlist list1, omlist list2, omlist_cmp_fn func)
+static omlist omlist_sort_merge(om_block * om, omlist list1, omlist list2,
+                                omlist_cmp_fn func)
 {
     omlistentry *l1 = omo2p(om->base, list1);
     omlistentry *l2 = omo2p(om->base, list2);

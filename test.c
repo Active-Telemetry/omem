@@ -29,6 +29,7 @@
 
 #define TEST_ITERATIONS     5000
 #define TEST_ITERATIONS_BIG 100000
+#define TEST_SHM_FNAME      "/tmp/omem_test.shm"
 
 static inline uint64_t get_time_us(void)
 {
@@ -60,13 +61,15 @@ static om_block *omm;
 
 int suite_init(void)
 {
-    omm = (om_block *) malloc(sizeof(om_block) + TEST_HEAP_SIZE);
-    ominit(omm, TEST_HEAP_SIZE);
+    if (system("touch /tmp/omem_test.shm"));
+    omm = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE);
     return 0;
 }
 
 int suite_shutdown(void)
 {
+    omdestroy(omm);
+    if (system("rm /tmp/omem_test.shm"));
     return 0;
 }
 
@@ -378,12 +381,9 @@ void test_list_find()
     CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e2)) != 0);
     CU_ASSERT((thelist = omlist_prepend(omm, thelist, (omlistentry *) e3)) != 0);
     CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy") == NULL);
-    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy1") ==
-              (omlistentry *) e1);
-    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy2") ==
-              (omlistentry *) e2);
-    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy3") ==
-              (omlistentry *) e3);
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy1") == (omlistentry *) e1);
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy2") == (omlistentry *) e2);
+    CU_ASSERT(omlist_find(omm, thelist, list_entry_find, "dummy3") == (omlistentry *) e3);
     thelist = omlist_remove(omm, thelist, (omlistentry *) e1);
     thelist = omlist_remove(omm, thelist, (omlistentry *) e2);
     thelist = omlist_remove(omm, thelist, (omlistentry *) e3);
@@ -681,8 +681,7 @@ void test_htable_add_delete_lots()
     omhtable_stats(omm, htable);
     for (i = 0; i < 10000; i++) {
         int offset = 0;
-        CU_ASSERT((e =
-                   (htable_entry *) omhtable_get(omm, htable, i, &offset)) != NULL);
+        CU_ASSERT((e = (htable_entry *) omhtable_get(omm, htable, i, &offset)) != NULL);
         omhtable_delete(omm, htable, i, (omhtentry *) e);
         htable_entry_free(e);
     }

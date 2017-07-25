@@ -23,6 +23,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <glib.h>
 #include "omem.h"
 
@@ -107,11 +110,13 @@ void omstats(om_block * om)
 size_t omavailable(om_block * om)
 {
     size_t free = 0;
-    om_meta *bp = (om_meta *) om->base;
-    while ((size_t) bp < ((size_t) om->base + om->size)) {
-        if (BLK_FREE(bp))
-            free += BLK_SIZE(bp);
-        bp = BLK_NEXT(bp);
+    if (om) {
+        om_meta *bp = (om_meta *) om->base;
+        while ((size_t) bp < ((size_t) om->base + om->size)) {
+            if (BLK_FREE(bp))
+                free += BLK_SIZE(bp);
+            bp = BLK_NEXT(bp);
+        }
     }
     return free;
 }
@@ -163,18 +168,6 @@ static void *find_fit(om_block * om, size_t size)
     return NULL;
 }
 
-void ominit(om_block * om, size_t size)
-{
-    om_meta *bp;
-
-    om->size = size;
-    memset((void *) om->base, 0, om->size);
-    bp = (om_meta *) om->base;
-    BLK_SET(bp, size, false);
-    om->next = 0;
-    return;
-}
-
 void *omalloc(om_block * om, size_t size)
 {
     size_t blk_size;
@@ -210,4 +203,49 @@ void omfree(om_block * om, void *m)
         BLK_SET(bp, BLK_SIZE(bp), false);
         coalesce(om, bp);
     }
+}
+
+om_block *omcreate(const char *fname, size_t rsize)
+{
+    om_block *om = NULL;
+    size_t pgsz = sysconf(_SC_PAGE_SIZE);
+    key_t key;
+    int shmid;
+    om_meta *bp;
+
+    size_t size = rsize + sizeof(om_block);
+    size = (((size) + (pgsz) - 1) & ~((pgsz) - 1));
+
+    key = ftok(fname, 'R');
+    if (key < 0) {
+        perror("ftok");
+        return NULL;
+    }
+
+    shmid = shmget(key, size, 0644 | IPC_CREAT);
+    if (shmid < 0) {
+        perror("shmid");
+        return NULL;
+    }
+
+    om = (om_block *) shmat(shmid, (void *) 0, 0);
+    if (om == (om_block *) (-1)) {
+        perror("shmat");
+        return NULL;
+    }
+
+    om->size = rsize;
+    memset((void *) om->base, 0, om->size);
+    bp = (om_meta *) om->base;
+    BLK_SET(bp, rsize, false);
+    om->next = 0;
+    return om;
+}
+
+void omdestroy(om_block * om)
+{
+    if (om && shmdt(om) == -1) {
+        perror("shmdt");
+    }
+    return;
 }

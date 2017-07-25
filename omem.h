@@ -43,11 +43,12 @@ typedef struct om_block {
 /**
  * Routines for memory allocation
  */
-void ominit(om_block * om, size_t size);
+om_block *omcreate(const char *fname, size_t size);
 void *omalloc(om_block * om, size_t size);
-void omfree(om_block * om, void * m);
+void omfree(om_block * om, void *m);
 size_t omavailable(om_block * om);
 void omstats(om_block * om);
+void omdestroy(om_block * om);
 
 /*********************************
  * Offset based list
