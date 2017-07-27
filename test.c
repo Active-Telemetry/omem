@@ -31,6 +31,7 @@
 #define TEST_ITERATIONS     5000
 #define TEST_ITERATIONS_BIG 50000
 #define TEST_SHM_FNAME      "/tmp/omem_test.shm"
+#define TEST_HEADROOM       8
 
 static inline uint64_t get_time_us(void)
 {
@@ -70,7 +71,7 @@ int suite_init(void)
     cmd = g_strdup_printf("ipcrm -M 0x%08x", ftok(TEST_SHM_FNAME, 'R'));
     if (system(cmd) == 0)
         g_free(cmd);
-    omm = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE);
+    omm = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE, TEST_HEADROOM);
     return 0;
 }
 
@@ -83,7 +84,7 @@ int suite_shutdown(void)
 
 void test_attach()
 {
-    om_block *om = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE);
+    om_block *om = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE, TEST_HEADROOM);
     CU_ASSERT(om != omm);
     CU_ASSERT(omavailable(om) == TEST_HEAP_SIZE);
     omdestroy(om);

@@ -38,13 +38,13 @@ typedef struct om_block {
     int shmid;
     size_t size;
     offset_t next;
-    uint8_t base[0];
+    size_t headroom;
 } om_block;
 
 /**
  * Routines for memory allocation
  */
-om_block *omcreate(const char *fname, size_t size);
+om_block *omcreate(const char *fname, size_t size, size_t headroom);
 void *omalloc(om_block * om, size_t size);
 void omfree(om_block * om, void *m);
 size_t omavailable(om_block * om);

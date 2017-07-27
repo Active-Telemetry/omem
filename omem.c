@@ -37,6 +37,7 @@ typedef struct om_meta {
 /* Macro's for manipulating block meta-data */
 #define META_SIZE               sizeof(om_meta)
 #define ALIGNMENT               8       /* Must be a power of 2 */
+#define BLK_BASE(om)            ((size_t)om + sizeof(om_block) + om->headroom)
 #define BLK_MIN_SIZE            ((2 * META_SIZE) + 8)
 #define BLK_ALIGN(size)         (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 #define BLK_USED(m)             ((m)->mark & 1)
@@ -64,8 +65,8 @@ void omstats(om_block * om)
     size_t min_bucket = HISTOGRAM_NUM_BUCKETS;
     size_t i, j;
 
-    om_meta *bp = (om_meta *) om->base;
-    while ((size_t) bp < ((size_t) om->base + om->size)) {
+    om_meta *bp = (om_meta *) BLK_BASE(om);
+    while ((size_t) bp < (BLK_BASE(om) + om->size)) {
         size_t size = BLK_SIZE(bp);
         if (BLK_FREE(bp)) {
             free += size;
@@ -111,8 +112,8 @@ size_t omavailable(om_block * om)
 {
     size_t free = 0;
     if (om) {
-        om_meta *bp = (om_meta *) om->base;
-        while ((size_t) bp < ((size_t) om->base + om->size)) {
+        om_meta *bp = (om_meta *) BLK_BASE(om);
+        while ((size_t) bp < (BLK_BASE(om) + om->size)) {
             if (BLK_FREE(bp))
                 free += BLK_SIZE(bp);
             bp = BLK_NEXT(bp);
@@ -126,23 +127,23 @@ size_t omavailable(om_block * om)
 static void *coalesce(om_block * om, om_meta * bp)
 {
     /* Check if there is a previous block */
-    if ((size_t) om->base < (size_t) bp) {
+    if (BLK_BASE(om) < (size_t) bp) {
         om_meta *prev = BLK_PREV(bp);
 
         /* Check if the previous block is free */
         if (BLK_FREE(prev)) {
             BLK_SET(prev, BLK_SIZE(prev) + BLK_SIZE(bp), 0);
-            if (om->next == ((size_t) bp - (size_t) om->base))
-                om->next = (size_t) prev - (size_t) om->base;
+            if (om->next == ((size_t) bp - BLK_BASE(om)))
+                om->next = (size_t) prev - BLK_BASE(om);
             bp = prev;
         }
     }
 
     /* Check if there is a next block that is free */
     om_meta *next = BLK_NEXT(bp);
-    if ((size_t) next < ((size_t) om->base + om->size) && BLK_FREE(next)) {
-        if (om->next == ((size_t) next - (size_t) om->base))
-            om->next = (size_t) bp - (size_t) om->base;
+    if ((size_t) next < (BLK_BASE(om) + om->size) && BLK_FREE(next)) {
+        if (om->next == ((size_t) next - BLK_BASE(om)))
+            om->next = (size_t) bp - BLK_BASE(om);
         BLK_SET(bp, BLK_SIZE(bp) + BLK_SIZE(next), false);
     }
     return bp;
@@ -154,12 +155,12 @@ static void *find_fit(om_block * om, size_t size)
     size_t checked = 0;
     om_meta *bp;
 
-    bp = (om_meta *) (om->base + om->next);
+    bp = (om_meta *) (BLK_BASE(om) + om->next);
     while (1) {
         if (checked >= om->size)
             break;
-        if ((size_t) bp >= ((size_t) om->base + om->size))
-            bp = (om_meta *) om->base;
+        if ((size_t) bp >= (BLK_BASE(om) + om->size))
+            bp = (om_meta *) BLK_BASE(om);
         if (BLK_FREE(bp) && BLK_SIZE(bp) >= size)
             return bp;
         checked += BLK_SIZE(bp);
@@ -183,7 +184,7 @@ void *omalloc(om_block * om, size_t size)
         assert(bp && "om_block exhausted");
         return 0;
     }
-    om->next = (size_t) bp - (size_t) om->base;
+    om->next = (size_t) bp - BLK_BASE(om);
 
     if (blk_size < BLK_SIZE(bp) && (BLK_SIZE(bp) - blk_size) > BLK_MIN_SIZE) {
         om_meta *next = (om_meta *) ((uint8_t *) bp + blk_size);
@@ -205,7 +206,7 @@ void omfree(om_block * om, void *m)
     }
 }
 
-om_block *omcreate(const char *fname, size_t rsize)
+om_block *omcreate(const char *fname, size_t rsize, size_t headroom)
 {
     om_block *om = NULL;
     size_t pgsz = sysconf(_SC_PAGE_SIZE);
@@ -214,7 +215,7 @@ om_block *omcreate(const char *fname, size_t rsize)
     int shmid = 0;
     om_meta *bp;
 
-    size_t size = rsize + sizeof(om_block);
+    size_t size = sizeof(om_block) + headroom + rsize;
     size = (((size) + (pgsz) - 1) & ~((pgsz) - 1));
 
     if (fname != NULL) {
@@ -254,8 +255,9 @@ om_block *omcreate(const char *fname, size_t rsize)
 
     om->shmid = 0;
     om->size = rsize;
-    memset((void *) om->base, 0, om->size);
-    bp = (om_meta *) om->base;
+    om->headroom = headroom;
+    memset((void *) BLK_BASE(om), 0, rsize);
+    bp = (om_meta *) BLK_BASE(om);
     BLK_SET(bp, rsize, false);
     om->next = 0;
     om->shmid = shmid;

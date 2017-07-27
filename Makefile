@@ -51,6 +51,6 @@ install: all
 
 clean:
 	@echo "Cleaning..."
-	@rm -f $(LIBRARY) test $(OBJS)
+	@rm -f $(LIBRARY) test $(OBJS) *.c~ *.h~
 
 .PHONY: all clean test indent
