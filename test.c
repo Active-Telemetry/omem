@@ -864,6 +864,7 @@ void _htable_find_performance(size_t buckets, size_t count)
                    e->str) != NULL);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
+    CU_ASSERT(omhtable_size(omm, htable) == count);
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
         htable_entry *e = (htable_entry *) iter->data;
         omhtable_delete(omm, htable, omhtable_strhash(e->str), (omhtentry *) e);
@@ -875,19 +876,53 @@ void _htable_find_performance(size_t buckets, size_t count)
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
-void test_htable_find_performance_32buckets()
+void test_htable_find_perf_32buckets()
 {
     _htable_find_performance(32, TEST_ITERATIONS);
 }
 
-void test_htable_find_performance_250buckets()
+void test_htable_find_perf_250buckets()
 {
     _htable_find_performance(250, TEST_ITERATIONS);
 }
 
-void test_htable_find_performance_1000buckets()
+void test_htable_find_perf_1000buckets()
 {
     _htable_find_performance(1000, TEST_ITERATIONS);
+}
+
+void test_g_hash_table_find_perf()
+{
+    GHashTable *htable = g_hash_table_new(g_str_hash, g_str_equal);
+    uint64_t start;
+    int i;
+    GList *entries = NULL;
+    GList *iter;
+
+    for (i = 0; i < TEST_ITERATIONS; i++) {
+        char *s = g_strdup_printf("%x", rand());
+        htable_entry *e = htable_entry_new(s);
+        free(s);
+        entries = g_list_prepend(entries, e);
+        g_hash_table_insert(htable, e->str, (gpointer) e);
+    }
+    entries = g_list_reverse(entries);
+    start = get_time_us();
+    for (i = 0, iter = entries; iter; iter = iter->next, i++) {
+        htable_entry *e = (htable_entry *) iter->data;
+        CU_ASSERT(g_hash_table_lookup(htable, e->str) != NULL);
+    }
+    printf("%" PRIu64 "us ... ", (get_time_us() - start));
+    CU_ASSERT(g_hash_table_size(htable) == TEST_ITERATIONS);
+    for (i = 0, iter = entries; iter; iter = iter->next, i++) {
+        htable_entry *e = (htable_entry *) iter->data;
+        g_hash_table_remove(htable, e->str);
+        htable_entry_free(e);
+    }
+    g_list_free(entries);
+    CU_ASSERT(g_hash_table_size(htable) == 0);
+    g_hash_table_destroy(htable);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 static CU_TestInfo tests_malloc[] = {
@@ -937,10 +972,10 @@ static CU_TestInfo tests_htable[] = {
     {"find removed", test_htable_find_removed},
     {"add performance 5000 entries 32 buckets", test_htable_add_performance},
     {"delete performance 5000 entries 32 buckets", test_htable_delete_performance},
-    {"find performance 5000 entries 32 buckets", test_htable_find_performance_32buckets},
-    {"find performance 5000 entries 250 buckets", test_htable_find_performance_250buckets},
-    {"find performance 5000 entries 1000 buckets",
-     test_htable_find_performance_1000buckets},
+    {"find performance 5000 entries 32 buckets", test_htable_find_perf_32buckets},
+    {"find performance 5000 entries 250 buckets", test_htable_find_perf_250buckets},
+    {"find performance 5000 entries 1000 buckets", test_htable_find_perf_1000buckets},
+    {"g_hash_table find performance 5000 entries", test_g_hash_table_find_perf},
     CU_TEST_INFO_NULL,
 };
 
