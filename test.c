@@ -891,6 +891,11 @@ void test_htable_find_perf_1000buckets()
     _htable_find_performance(1000, TEST_ITERATIONS);
 }
 
+void test_htable_find_perf_2500buckets()
+{
+    _htable_find_performance(2500, TEST_ITERATIONS);
+}
+
 void test_g_hash_table_find_perf()
 {
     GHashTable *htable = g_hash_table_new(g_str_hash, g_str_equal);
@@ -975,6 +980,7 @@ static CU_TestInfo tests_htable[] = {
     {"find performance 5000 entries 32 buckets", test_htable_find_perf_32buckets},
     {"find performance 5000 entries 250 buckets", test_htable_find_perf_250buckets},
     {"find performance 5000 entries 1000 buckets", test_htable_find_perf_1000buckets},
+    {"find performance 5000 entries 2500 buckets", test_htable_find_perf_2500buckets},
     {"g_hash_table find performance 5000 entries", test_g_hash_table_find_perf},
     CU_TEST_INFO_NULL,
 };

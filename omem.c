@@ -211,41 +211,45 @@ om_block *omcreate(const char *fname, size_t rsize)
     size_t pgsz = sysconf(_SC_PAGE_SIZE);
     bool already_init = false;
     key_t key;
-    int shmid;
+    int shmid = 0;
     om_meta *bp;
 
     size_t size = rsize + sizeof(om_block);
     size = (((size) + (pgsz) - 1) & ~((pgsz) - 1));
 
-    key = ftok(fname, 'R');
-    if (key < 0) {
-        perror("ftok");
-        return NULL;
-    }
-
-    shmid = shmget(key, size, 0644 | IPC_CREAT | IPC_EXCL);
-    if (shmid < 0) {
-        /* Another process is initializing this memory */
-        shmid = shmget(key, size, 0644);
-        already_init = 1;
-    }
-
-    om = (om_block *) shmat(shmid, (void *) 0, 0);
-    if (om == (om_block *) (-1)) {
-        perror("shmat");
-        return NULL;
-    }
-
-    if (already_init) {
-        /* Wait for the other process to finish if required */
-        while (shmid != om->shmid)
-            usleep(10);
-        if (om->size != rsize) {
-            /* Incompatible shared memory segments! */
-            shmdt(om);
+    if (fname != NULL) {
+        key = ftok(fname, 'R');
+        if (key < 0) {
+            perror("ftok");
             return NULL;
         }
-        return om;
+
+        shmid = shmget(key, size, 0644 | IPC_CREAT | IPC_EXCL);
+        if (shmid < 0) {
+            /* Another process is initializing this memory */
+            shmid = shmget(key, size, 0644);
+            already_init = 1;
+        }
+
+        om = (om_block *) shmat(shmid, (void *) 0, 0);
+        if (om == (om_block *) (-1)) {
+            perror("shmat");
+            return NULL;
+        }
+
+        if (already_init) {
+            /* Wait for the other process to finish if required */
+            while (shmid != om->shmid)
+                usleep(10);
+            if (om->size != rsize) {
+                /* Incompatible shared memory segments! */
+                shmdt(om);
+                return NULL;
+            }
+            return om;
+        }
+    } else {
+        om = (om_block *) malloc(size);
     }
 
     om->shmid = 0;
@@ -260,8 +264,12 @@ om_block *omcreate(const char *fname, size_t rsize)
 
 void omdestroy(om_block * om)
 {
-    if (om && shmdt(om) == -1) {
-        perror("shmdt");
+    if (!om)
+        return;
+    if (om->shmid) {
+        shmdt(om);
+    } else {
+        free(om);
     }
     return;
 }
