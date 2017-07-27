@@ -23,12 +23,13 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <sys/ipc.h>
 #include <glib.h>
 #include <CUnit/Basic.h>
 #include "omem.h"
 
 #define TEST_ITERATIONS     5000
-#define TEST_ITERATIONS_BIG 100000
+#define TEST_ITERATIONS_BIG 50000
 #define TEST_SHM_FNAME      "/tmp/omem_test.shm"
 
 static inline uint64_t get_time_us(void)
@@ -61,7 +62,14 @@ static om_block *omm;
 
 int suite_init(void)
 {
-    if (system("touch /tmp/omem_test.shm"));
+    char *cmd;
+
+    cmd = g_strdup_printf("touch %s", TEST_SHM_FNAME);
+    if (system(cmd) == 0)
+        g_free(cmd);
+    cmd = g_strdup_printf("ipcrm -M 0x%08x", ftok(TEST_SHM_FNAME, 'R'));
+    if (system(cmd) == 0)
+        g_free(cmd);
     omm = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE);
     return 0;
 }
@@ -71,6 +79,15 @@ int suite_shutdown(void)
     omdestroy(omm);
     if (system("rm /tmp/omem_test.shm"));
     return 0;
+}
+
+void test_attach()
+{
+    om_block *om = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE);
+    CU_ASSERT(om != omm);
+    CU_ASSERT(omavailable(om) == TEST_HEAP_SIZE);
+    omdestroy(om);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_malloc_0()
@@ -188,10 +205,10 @@ void test_malloc_performance_fragmented()
     }
     start = get_time_us();
     for (i = 0; i < TEST_ITERATIONS_BIG; i++) {
-        allocated = g_list_prepend(allocated, g_malloc(64));
+        allocated = g_list_prepend(allocated, omalloc(omm, 64));
     }
     for (iter = allocated; iter; iter = iter->next) {
-        g_free(iter->data);
+        omfree(omm, iter->data);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start));
     g_list_free(allocated);
@@ -874,6 +891,7 @@ void test_htable_find_performance_1000buckets()
 }
 
 static CU_TestInfo tests_malloc[] = {
+    {"attach", test_attach},
     {"malloc 0 bytes", test_malloc_0},
     {"free_null", test_free_null},
     {"malloc 1 byte", test_malloc1},

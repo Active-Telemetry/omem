@@ -209,6 +209,7 @@ om_block *omcreate(const char *fname, size_t rsize)
 {
     om_block *om = NULL;
     size_t pgsz = sysconf(_SC_PAGE_SIZE);
+    bool already_init = false;
     key_t key;
     int shmid;
     om_meta *bp;
@@ -222,10 +223,11 @@ om_block *omcreate(const char *fname, size_t rsize)
         return NULL;
     }
 
-    shmid = shmget(key, size, 0644 | IPC_CREAT);
+    shmid = shmget(key, size, 0644 | IPC_CREAT | IPC_EXCL);
     if (shmid < 0) {
-        perror("shmid");
-        return NULL;
+        /* Another process is initializing this memory */
+        shmid = shmget(key, size, 0644);
+        already_init = 1;
     }
 
     om = (om_block *) shmat(shmid, (void *) 0, 0);
@@ -234,11 +236,25 @@ om_block *omcreate(const char *fname, size_t rsize)
         return NULL;
     }
 
+    if (already_init) {
+        /* Wait for the other process to finish if required */
+        while (shmid != om->shmid)
+            usleep(10);
+        if (om->size != rsize) {
+            /* Incompatible shared memory segments! */
+            shmdt(om);
+            return NULL;
+        }
+        return om;
+    }
+
+    om->shmid = 0;
     om->size = rsize;
     memset((void *) om->base, 0, om->size);
     bp = (om_meta *) om->base;
     BLK_SET(bp, rsize, false);
     om->next = 0;
+    om->shmid = shmid;
     return om;
 }
 

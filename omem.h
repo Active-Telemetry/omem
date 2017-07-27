@@ -35,6 +35,7 @@ typedef size_t offset_t;
  * A memory segment provided to the allocator
  */
 typedef struct om_block {
+    int shmid;
     size_t size;
     offset_t next;
     uint8_t base[0];
