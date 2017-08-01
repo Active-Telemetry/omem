@@ -99,6 +99,7 @@ omhtentry *omhtable_get(om_block * om, omhtable * ht, size_t hash, int *offset)
 omhtentry *omhtable_find(om_block * om, omhtable * ht, omhtable_cmp_fn cmp, size_t hash,
                          void *data)
 {
+    assert(ht && ht->size);
     hash = hash % ht->size;
     return (omhtentry *) omlist_find(om, ht->table[hash], (omlist_find_fn) cmp, data);
 }

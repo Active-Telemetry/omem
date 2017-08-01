@@ -72,9 +72,9 @@ size_t omlist_length(om_block * om, omlist l);
 omlistentry *omlist_get(om_block * om, omlist l, unsigned int offset);
 omlist omlist_reverse(om_block * om, omlist l);
 omlist omlist_concat(om_block * om, omlist l1, omlist l2);
-typedef bool(*omlist_find_fn) (omlistentry * e, void *data);
+typedef bool(*omlist_find_fn) (om_block * om, omlistentry * e, void *data);
 omlistentry *omlist_find(om_block * om, omlist l, omlist_find_fn func, void *data);
-typedef int (*omlist_cmp_fn) (omlistentry * e1, omlistentry * e2);
+typedef int (*omlist_cmp_fn) (om_block * om, omlistentry * e1, omlistentry * e2);
 omlist omlist_sort(om_block * om, omlist l, omlist_cmp_fn func);
 
 /*********************************
@@ -99,7 +99,7 @@ void omhtable_add(om_block * om, omhtable * ht, size_t hash, omhtentry * e);
 void omhtable_delete(om_block * om, omhtable * ht, size_t hash, omhtentry * e);
 size_t omhtable_size(om_block * om, omhtable * ht);
 omhtentry *omhtable_get(om_block * om, omhtable * ht, size_t hash, int *offset);
-typedef bool(*omhtable_cmp_fn) (omhtentry * e, void *data);
+typedef bool(*omhtable_cmp_fn) (om_block * om, omhtentry * e, void *data);
 omhtentry *omhtable_find(om_block * om, omhtable * ht, omhtable_cmp_fn cmp, size_t hash,
                          void *data);
 void omhtable_stats(om_block * om, omhtable * ht);

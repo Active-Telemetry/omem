@@ -133,7 +133,7 @@ omlistentry *omlist_find(om_block * om, omlist l, omlist_find_fn func, void *dat
     assert(func);
     omlistentry *list = omo2p(om, l);
     while (list) {
-        if (func(list, data))
+        if (func(om, list, data))
             return list;
         list = omo2p(om, list->next);
     }
@@ -150,7 +150,7 @@ static omlist omlist_sort_merge(om_block * om, omlist list1, omlist list2,
     l = &list;
     lprev = NULL;
     while (l1 && l2) {
-        cmp = func(l1, l2);
+        cmp = func(om, l1, l2);
         if (cmp <= 0) {
             l->next = omp2o(om, l1);
             l1 = omo2p(om, l1->next);

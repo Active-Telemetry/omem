@@ -66,11 +66,11 @@ int suite_init(void)
     char *cmd;
 
     cmd = g_strdup_printf("touch %s", TEST_SHM_FNAME);
-    if (system(cmd) == 0)
-        g_free(cmd);
+    if (system(cmd));
+    g_free(cmd);
     cmd = g_strdup_printf("ipcrm -M 0x%08x", ftok(TEST_SHM_FNAME, 'R'));
-    if (system(cmd) == 0)
-        g_free(cmd);
+    if (system(cmd));
+    g_free(cmd);
     omm = omcreate(TEST_SHM_FNAME, TEST_HEAP_SIZE, TEST_HEADROOM);
     return 0;
 }
@@ -239,12 +239,12 @@ static void list_entry_free(list_entry * e)
     omfree(omm, e);
 }
 
-static bool list_entry_find(omlistentry * e, void *data)
+static bool list_entry_find(om_block * om, omlistentry * e, void *data)
 {
     return (strcmp(((list_entry *) e)->str, (char *) data) == 0);
 }
 
-static int list_entry_cmp(omlistentry * e1, omlistentry * e2)
+static int list_entry_cmp(om_block * om, omlistentry * e1, omlistentry * e2)
 {
     return strcmp(((list_entry *) e1)->str, ((list_entry *) e2)->str);
 }
@@ -546,6 +546,11 @@ void test_list_find_performance()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
+static int glist_entry_cmp(omlistentry * e1, omlistentry * e2)
+{
+    return strcmp(((list_entry *) e1)->str, ((list_entry *) e2)->str);
+}
+
 void test_glist_find_performance()
 {
     uint64_t start;
@@ -563,7 +568,7 @@ void test_glist_find_performance()
     start = get_time_us();
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
         list_entry *e = (list_entry *) iter->data;
-        CU_ASSERT(g_list_find_custom(entries, e, (GCompareFunc) list_entry_cmp) != NULL);
+        CU_ASSERT(g_list_find_custom(entries, e, (GCompareFunc) glist_entry_cmp) != NULL);
     }
     printf("%" PRIu64 "us ... ", (get_time_us() - start) / TEST_ITERATIONS);
     for (i = 0, iter = entries; iter; iter = iter->next, i++) {
@@ -593,7 +598,7 @@ static void htable_entry_free(htable_entry * e)
     omfree(omm, e);
 }
 
-static bool htable_entry_cmp(htable_entry * e, char *str)
+static bool htable_entry_cmp(om_block * om, htable_entry * e, char *str)
 {
     return (strcmp(e->str, str) == 0);
 }
@@ -836,7 +841,7 @@ void test_htable_delete_performance()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
-bool _htable_find_cmp_fn(omhtentry * e, void *data)
+static bool _htable_find_cmp_fn(om_block * om, omhtentry * e, void *data)
 {
     return (strcmp(((htable_entry *) e)->str, (char *) data) == 0);
 }
