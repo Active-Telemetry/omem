@@ -24,7 +24,7 @@ endif
 
 TARGET = omem
 LIBRARY = lib$(TARGET).so
-OBJS = omem.o omlist.o omhtable.o
+OBJS = omem.o omlist.o omhtable.o omhtree.o
 
 all: $(LIBRARY)
 

@@ -936,6 +936,24 @@ void test_g_hash_table_find_perf()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
+typedef struct pvnode {
+    omhtree tree;
+    char value[0];
+} pvnode;
+
+void test_htree_add_delete()
+{
+    omhtree tree = { };
+    char value[] = "testing";
+    int size = sizeof(pvnode) + strlen(value) + 1;
+    pvnode *node;
+
+    node = (pvnode *) omhtree_add(omm, &tree, "/test/node", size);
+    CU_ASSERT(node != NULL);
+    omhtree_delete(omm, &tree, (omhtree *) node);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
 static CU_TestInfo tests_malloc[] = {
     {"attach", test_attach},
     {"malloc 0 bytes", test_malloc_0},
@@ -991,10 +1009,16 @@ static CU_TestInfo tests_htable[] = {
     CU_TEST_INFO_NULL,
 };
 
+static CU_TestInfo tests_htree[] = {
+    {"add/delete", test_htree_add_delete},
+    CU_TEST_INFO_NULL,
+};
+
 static CU_SuiteInfo suites[] = {
     {"Malloc tests", suite_init, suite_shutdown, 0, 0, tests_malloc},
     {"List tests", suite_init, suite_shutdown, 0, 0, tests_list},
     {"Hash Table tests", suite_init, suite_shutdown, 0, 0, tests_htable},
+    {"Hash Tree tests", suite_init, suite_shutdown, 0, 0, tests_htree},
     CU_SUITE_INFO_NULL,
 };
 

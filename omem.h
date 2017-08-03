@@ -104,3 +104,20 @@ omhtentry *omhtable_find(om_block * om, omhtable * ht, omhtable_cmp_fn cmp, size
                          void *data);
 void omhtable_stats(om_block * om, omhtable * ht);
 size_t omhtable_strhash(const char *s);
+
+/*********************************
+ * Offset based hash tree
+ *********************************/
+/**
+ * Hash tree node
+ */
+typedef struct omhtree {
+    omhtentry base;
+    offset_t parent;
+    offset_t key;
+    offset_t children;
+} omhtree;
+
+omhtree *omhtree_add(om_block * om, omhtree * root, const char *path, size_t size);
+void omhtree_delete(om_block * om, omhtree * root, omhtree * node);
+omhtree *omhtree_path_to_node(om_block * om, omhtree * root, const char *path);
