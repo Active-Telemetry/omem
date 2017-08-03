@@ -27,6 +27,14 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <glib.h>
+#ifdef HAVE_VALGRIND
+#include <valgrind.h>
+#include <memcheck.h>
+#else
+#define VALGRIND_MALLOCLIKE_BLOCK(addr, sizeB, rzB, is_zeroed)
+#define VALGRIND_FREELIKE_BLOCK(addr, rzB)
+#define VALGRIND_MAKE_MEM_DEFINED(_qzz_addr,_qzz_len)
+#endif
 #include "omem.h"
 
 /* Meta stored at start and end of allocated blocks */
@@ -127,7 +135,7 @@ size_t omavailable(om_block * om)
 static void *coalesce(om_block * om, om_meta * bp)
 {
     /* Check if there is a previous block */
-    if (BLK_BASE(om) < (size_t) bp) {
+    if (BLK_BASE(om) < ((size_t) bp - META_SIZE)) {
         om_meta *prev = BLK_PREV(bp);
 
         /* Check if the previous block is free */
@@ -192,16 +200,18 @@ void *omalloc(om_block * om, size_t size)
     }
     BLK_SET(bp, blk_size, true);
 
+    VALGRIND_MALLOCLIKE_BLOCK(((uint8_t *) bp + META_SIZE), (blk_size - (2 * META_SIZE)), 0, 0);
     return (void *) ((uint8_t *) bp + META_SIZE);
 }
 
 void omfree(om_block * om, void *m)
 {
     if (m) {
-        om_meta *bp;
-
-        bp = (om_meta *) ((uint8_t *) m - META_SIZE);
-        BLK_SET(bp, BLK_SIZE(bp), false);
+        VALGRIND_FREELIKE_BLOCK(m, 0);
+        om_meta *bp = (om_meta *) ((uint8_t *) m - META_SIZE);
+        size_t size = BLK_SIZE(bp);
+        VALGRIND_MAKE_MEM_DEFINED(m, (size - (2 * META_SIZE)));
+        BLK_SET(bp, size, false);
         coalesce(om, bp);
     }
 }

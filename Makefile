@@ -14,6 +14,14 @@ EXTRA_CFLAGS += -Wall -Wno-comment -std=c99 -D_GNU_SOURCE -fPIC
 EXTRA_CFLAGS += -I. $(shell $(PKG_CONFIG) --cflags glib-2.0)
 EXTRA_LDFLAGS := $(shell $(PKG_CONFIG) --libs glib-2.0) -lpthread
 
+VALGRINDCMD=
+ifneq ($(VALGRIND),no)
+ifeq ($(shell $(PKG_CONFIG) --exists valgrind && echo 1),1)
+EXTRA_CFLAGS += -DHAVE_VALGRIND $(shell $(PKG_CONFIG) --cflags valgrind)
+VALGRINDCMD=valgrind --leak-check=full
+endif
+endif
+
 TARGET = omem
 LIBRARY = lib$(TARGET).so
 OBJS = omem.o omlist.o omhtable.o
@@ -35,7 +43,7 @@ endif
 test: $(LIBRARY) test.c
 	$(Q)$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ $^ -L. -l$(TARGET) -lcunit $(EXTRA_LDFLAGS)
 	@echo "Running unit test: $<"
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):./ ./test $(TEST_ARGS)
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):./ $(VALGRINDCMD) ./test $(TEST_ARGS)
 	@echo "Tests have been run!"
 
 indent:
