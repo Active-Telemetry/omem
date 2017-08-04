@@ -29,6 +29,7 @@
 #include "omem.h"
 
 #define TEST_ITERATIONS     5000
+#define TEST_ENTRIES        10000
 #define TEST_ITERATIONS_BIG 50000
 #define TEST_SHM_FNAME      "/tmp/omem_test.shm"
 #define TEST_HEADROOM       8
@@ -954,6 +955,161 @@ void test_htree_add_delete()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
+void test_htree_add_delete_perf()
+{
+    omhtree tree = { };
+    char *path = NULL;
+    pvnode *node;
+    uint64_t start;
+    int i;
+
+    for (i = 0; i < TEST_ENTRIES; i++) {
+        path = g_strdup_printf("/database/test%d/test%d", i, i);
+        CU_ASSERT(omhtree_add(omm, &tree, path, sizeof(pvnode)) != NULL);
+        g_free(path);
+    }
+
+    start = get_time_us();
+    path = g_strdup_printf("/database/test%d/test%d", TEST_ENTRIES, TEST_ENTRIES);
+    for (i = 0; i < TEST_ITERATIONS; i++) {
+        node = (pvnode *) omhtree_add(omm, &tree, path, sizeof(pvnode));
+        CU_ASSERT(node != NULL);
+        omhtree_delete(omm, &tree, (omhtree *) node);
+    }
+    printf("%" PRIu64 "us ... ", (get_time_us() - start) / TEST_ITERATIONS);
+
+    g_free(path);
+    for (i = 0; i < TEST_ENTRIES; i++) {
+        path = g_strdup_printf("/database/test%d/test%d", i, i);
+        node = (pvnode *) omhtree_find(omm, &tree, path);
+        CU_ASSERT(node != NULL);
+        omhtree_delete(omm, &tree, (omhtree *) node);
+        g_free(path);
+    }
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
+void test_htree_find()
+{
+    omhtree tree = { };
+    pvnode *node;
+    const char *path = "/database/test";
+
+    CU_ASSERT(omhtree_find(omm, &tree, path) == NULL);
+    CU_ASSERT(omhtree_add(omm, &tree, path, sizeof(pvnode)) != NULL);
+    node = (pvnode *) omhtree_find(omm, &tree, path);
+    CU_ASSERT(node != NULL);
+    omhtree_delete(omm, &tree, (omhtree *) node);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
+void test_htree_long_path()
+{
+    omhtree tree = { };
+    char *path = NULL;
+    pvnode *node;
+    int i;
+
+    path = g_strdup_printf("%s", "/database/test");
+    for (i = 0; i < 1024; i++) {
+        char *old = path;
+        path = g_strdup_printf("%s/%08x", old, rand());
+        g_free(old);
+    }
+    CU_ASSERT(omhtree_find(omm, &tree, path) == NULL);
+    CU_ASSERT(omhtree_add(omm, &tree, path, sizeof(pvnode)) != NULL);
+    node = (pvnode *) omhtree_find(omm, &tree, path);
+    CU_ASSERT(node != NULL);
+    omhtree_delete(omm, &tree, (omhtree *) node);
+    g_free((void *) path);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
+void _htree_path_perf(int path_length, bool full)
+{
+    omhtree tree = { };
+    pvnode *node;
+    char *path = NULL;
+    int count = TEST_ITERATIONS / path_length;
+    uint64_t start;
+    int i;
+
+    path = g_strdup_printf("%s", "/database");
+    for (i = 0; i < (path_length - 1); i++) {
+        char *old = path;
+        path = g_strdup_printf("%s/%08x", old, rand());
+        g_free(old);
+    }
+    if (!full) {
+        CU_ASSERT(omhtree_add(omm, &tree, path, sizeof(pvnode)) != NULL);
+        path[strlen(path) - 1]++;
+    }
+    start = get_time_us();
+    for (i = 0; i < count; i++) {
+        node = (pvnode *) omhtree_add(omm, &tree, path, sizeof(pvnode));
+        CU_ASSERT(node != NULL);
+        omhtree_delete(omm, &tree, (omhtree *) node);
+    }
+    printf("%d=%" PRIu64 "us ", path_length, (get_time_us() - start) / count);
+    if (!full) {
+        path[strlen(path) - 1]--;
+        node = (pvnode *) omhtree_find(omm, &tree, path);
+        CU_ASSERT(node != NULL);
+        omhtree_delete(omm, &tree, (omhtree *) node);
+    }
+    g_free(path);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
+void test_htree_path_perf()
+{
+    _htree_path_perf(5, true);
+    _htree_path_perf(10, true);
+    _htree_path_perf(100, true);
+    _htree_path_perf(1000, true);
+    printf("... ");
+}
+
+void test_htree_path_exists_perf()
+{
+    _htree_path_perf(5, false);
+    _htree_path_perf(10, false);
+    _htree_path_perf(100, false);
+    _htree_path_perf(1000, false);
+    printf(" ... ");
+}
+
+void test_htree_find_perf()
+{
+    omhtree tree = { };
+    pvnode *node;
+    char *path = NULL;
+    uint64_t start;
+    int i;
+
+    for (i = 0; i < TEST_ENTRIES; i++) {
+        path = g_strdup_printf("/database/test%d/test%d", i, i);
+        CU_ASSERT(omhtree_add(omm, &tree, path, sizeof(pvnode)) != NULL);
+        g_free(path);
+    }
+
+    start = get_time_us();
+    path = g_strdup_printf("/database/test%d/test%d", TEST_ENTRIES - 1, TEST_ENTRIES - 1);
+    for (i = 0; i < TEST_ITERATIONS_BIG; i++) {
+        CU_ASSERT(omhtree_find(omm, &tree, path) != NULL);
+    }
+    printf("%" PRIu64 "us ... ", (get_time_us() - start) / TEST_ITERATIONS_BIG);
+    g_free(path);
+    for (i = 0; i < TEST_ENTRIES; i++) {
+        path = g_strdup_printf("/database/test%d/test%d", i, i);
+        node = (pvnode *) omhtree_find(omm, &tree, path);
+        CU_ASSERT(node != NULL);
+        omhtree_delete(omm, &tree, (omhtree *) node);
+        g_free(path);
+    }
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
 static CU_TestInfo tests_malloc[] = {
     {"attach", test_attach},
     {"malloc 0 bytes", test_malloc_0},
@@ -1011,6 +1167,12 @@ static CU_TestInfo tests_htable[] = {
 
 static CU_TestInfo tests_htree[] = {
     {"add/delete", test_htree_add_delete},
+    {"find", test_htree_find},
+    {"long path", test_htree_long_path},
+    {"add/delete perf", test_htree_add_delete_perf},
+    {"path performance", test_htree_path_perf},
+    {"path exists perf", test_htree_path_exists_perf},
+    {"find performance", test_htree_find_perf},
     CU_TEST_INFO_NULL,
 };
 

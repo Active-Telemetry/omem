@@ -37,7 +37,7 @@ static bool omhtree_empty(om_block * om, omhtree * tree)
     return tree->children == 0 || (omhtable_size(om, omo2p(om, tree->children)) == 0);
 }
 
-omhtree *omhtree_path_to_node(om_block * om, omhtree * root, const char *path)
+omhtree *omhtree_find(om_block * om, omhtree * root, const char *path)
 {
     char *ptr = NULL;
     char *key = NULL;
@@ -107,8 +107,8 @@ omhtree *omhtree_add(om_block * om, omhtree * root, const char *path, size_t siz
 
 void omhtree_delete(om_block * om, omhtree * root, omhtree * node)
 {
-    assert(node);
-    assert(node->key);
+    if (!node || !node->key)
+        return;
 
     omhtree *parent = (omhtree *) omo2p(om, node->parent);
     if (parent && parent->children) {
