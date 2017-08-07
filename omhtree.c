@@ -74,7 +74,8 @@ omhtree *omhtree_add(om_block * om, omhtree * root, const char *path, size_t siz
     omhtree *node = NULL;
     omhtree *parent = root;
 
-    assert(size >= sizeof(omhtree));
+    if (size < sizeof(omhtree))
+        return NULL;
 
     key = strtok_r(p, "/", &ptr);
     while (key) {
