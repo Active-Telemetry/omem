@@ -120,4 +120,4 @@ typedef struct omhtree {
 
 omhtree *omhtree_add(om_block * om, omhtree * root, const char *path, size_t size);
 void omhtree_delete(om_block * om, omhtree * root, omhtree * node);
-omhtree *omhtree_find(om_block * om, omhtree * root, const char *path);
+omhtree *omhtree_get(om_block * om, omhtree * root, const char *path);

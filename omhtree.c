@@ -37,7 +37,7 @@ static bool omhtree_empty(om_block * om, omhtree * tree)
     return tree->children == 0 || (omhtable_size(om, omo2p(om, tree->children)) == 0);
 }
 
-omhtree *omhtree_find(om_block * om, omhtree * root, const char *path)
+omhtree *omhtree_get(om_block * om, omhtree * root, const char *path)
 {
     char *ptr = NULL;
     char *key = NULL;
