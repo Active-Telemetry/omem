@@ -200,7 +200,8 @@ void *omalloc(om_block * om, size_t size)
     }
     BLK_SET(bp, blk_size, true);
 
-    VALGRIND_MALLOCLIKE_BLOCK(((uint8_t *) bp + META_SIZE), (blk_size - (2 * META_SIZE)), 0, 0);
+    VALGRIND_MALLOCLIKE_BLOCK(((uint8_t *) bp + META_SIZE), (blk_size - (2 * META_SIZE)), 0,
+                              0);
     return (void *) ((uint8_t *) bp + META_SIZE);
 }
 

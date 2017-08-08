@@ -1016,6 +1016,7 @@ void test_htree_parent()
     CU_ASSERT(omhtree_parent(omm, node) != NULL);
     CU_ASSERT(omhtree_parent(omm, omhtree_parent(omm, node)) == &tree);
     omhtree_delete(omm, &tree, (omhtree *) node);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htree_key()
@@ -1034,6 +1035,31 @@ void test_htree_key()
     CU_ASSERT((key = omhtree_key(omm, omhtree_parent(omm, node))) != NULL);
     CU_ASSERT(key && strcmp(key, "database") == 0);
     omhtree_delete(omm, &tree, (omhtree *) node);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
+void test_htree_children()
+{
+    omhtree tree = { };
+    omhtree *parent;
+    omhtree *node;
+    char *paths[] = { "/database/child1", "/database/child2", "/database/child3" };
+    int count = 3;
+
+    omhtree_add(omm, &tree, paths[0], sizeof(omhtree));
+    omhtree_add(omm, &tree, paths[1], sizeof(omhtree));
+    omhtree_add(omm, &tree, paths[2], sizeof(omhtree));
+    parent = omhtree_get(omm, &tree, "/database");
+
+    while ((node = omhtree_child(omm, parent, NULL)) != NULL) {
+        count--;
+        CU_ASSERT(count >= 0);
+        if (count < 0)
+            break;
+        omhtree_delete(omm, &tree, (omhtree *) node);
+    }
+    CU_ASSERT(count == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
 void test_htree_long_path()
@@ -1203,6 +1229,7 @@ static CU_TestInfo tests_htree[] = {
     {"get", test_htree_get},
     {"parent", test_htree_parent},
     {"key", test_htree_key},
+    {"children", test_htree_children},
     {"long path", test_htree_long_path},
     {"add/delete perf", test_htree_add_delete_perf},
     {"path performance", test_htree_path_perf},

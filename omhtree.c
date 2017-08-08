@@ -148,3 +148,30 @@ void omhtree_delete(om_block * om, omhtree * root, omhtree * node)
         }
     }
 }
+
+omhtree *omhtree_child(om_block * om, omhtree * node, omhtree * prev)
+{
+    omhtable *table;
+    omhtree *child = NULL;
+    int i;
+
+    if (!node || !node->key || !node->children)
+        return NULL;
+
+    if (prev && prev->base.next) {
+        return (omhtree *) omo2p(om, prev->base.next);
+    }
+
+    table = (omhtable *) omo2p(om, node->children);
+    for (i = 0; i < table->size; i++) {
+        int offset = 0;
+        while ((child = (omhtree *) omhtable_get(om, table, i, &offset)) != NULL) {
+            if (prev == NULL)
+                return child;
+            if (prev == child)
+                prev = NULL;
+        }
+    }
+
+    return NULL;
+}

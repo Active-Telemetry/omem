@@ -123,3 +123,4 @@ void omhtree_delete(om_block * om, omhtree * root, omhtree * node);
 omhtree *omhtree_get(om_block * om, omhtree * root, const char *path);
 #define omhtree_parent(om, node) ((omhtree *) omo2p(om, ((omhtree *) node)->parent))
 #define omhtree_key(om, node) ((const char *) omo2p(om, ((omhtree *) node)->key))
+omhtree *omhtree_child(om_block * om, omhtree * node, omhtree * prev);
