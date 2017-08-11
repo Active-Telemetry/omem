@@ -1169,6 +1169,19 @@ void test_htree_get_perf()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
+void test_omhtree_stats()
+{
+    omhtree tree = { };
+    omhtree_add(omm, &tree, "/interfaces/eth0/state", sizeof(pvnode));
+    omhtree_add(omm, &tree, "/interfaces/eth0/speed", sizeof(pvnode));
+    omhtree_add(omm, &tree, "/interfaces/eth0/duplex", sizeof(pvnode));
+    omhtree_stats(omm, &tree);
+    omhtree_delete(omm, &tree, omhtree_get(omm, &tree, "/interfaces/eth0/state"));
+    omhtree_delete(omm, &tree, omhtree_get(omm, &tree, "/interfaces/eth0/speed"));
+    omhtree_delete(omm, &tree, omhtree_get(omm, &tree, "/interfaces/eth0/duplex"));
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
 static CU_TestInfo tests_malloc[] = {
     {"attach", test_attach},
     {"malloc 0 bytes", test_malloc_0},
@@ -1235,6 +1248,7 @@ static CU_TestInfo tests_htree[] = {
     {"path performance", test_htree_path_perf},
     {"path exists perf", test_htree_path_exists_perf},
     {"get performance", test_htree_get_perf},
+    {"stats", test_omhtree_stats},
     CU_TEST_INFO_NULL,
 };
 

@@ -37,6 +37,39 @@ static bool omhtree_empty(om_block * om, omhtree * tree)
     return tree->children == 0 || (omhtable_size(om, omo2p(om, tree->children)) == 0);
 }
 
+void _dump_node(om_block * om, omhtree * node, int depth)
+{
+    omhtable *table;
+    omhtree *child;
+    int i;
+
+    if (!node)
+        return;
+
+    printf("%*c", depth * 4, ' ');
+    if (node->key)
+        printf("%s", (char *) omo2p(om, node->key));
+    else
+        printf("(null)");
+    printf("\n");
+
+    if (node->children) {
+        table = (omhtable *) omo2p(om, node->children);
+        for (i = 0; i < table->size; i++) {
+            int offset = 0;
+            while ((child = (omhtree *) omhtable_get(om, table, i, &offset)) != NULL) {
+                _dump_node(om, child, depth + 1);
+            }
+        }
+    }
+}
+
+void omhtree_stats(om_block * om, omhtree * tree)
+{
+    printf("\n");
+    _dump_node(om, tree, 0);
+}
+
 omhtree *omhtree_get(om_block * om, omhtree * root, const char *path)
 {
     char *ptr = NULL;
@@ -155,7 +188,7 @@ omhtree *omhtree_child(om_block * om, omhtree * node, omhtree * prev)
     omhtree *child = NULL;
     int i;
 
-    if (!node || !node->key || !node->children)
+    if (!node || !node->children)
         return NULL;
 
     if (prev && prev->base.next) {
