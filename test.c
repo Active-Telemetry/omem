@@ -1062,6 +1062,28 @@ void test_htree_children()
     CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
 }
 
+void test_htree_children_root()
+{
+    omhtree tree = { };
+    omhtree *node;
+    char *paths[] = { "/child1", "/child2", "/child3" };
+    int count = 3;
+
+    omhtree_add(omm, &tree, paths[0], sizeof(omhtree));
+    omhtree_add(omm, &tree, paths[1], sizeof(omhtree));
+    omhtree_add(omm, &tree, paths[2], sizeof(omhtree));
+
+    while ((node = omhtree_child(omm, &tree, NULL)) != NULL) {
+        count--;
+        CU_ASSERT(count >= 0);
+        if (count < 0)
+            break;
+        omhtree_delete(omm, &tree, (omhtree *) node);
+    }
+    CU_ASSERT(count == 0);
+    CU_ASSERT(omavailable(omm) == TEST_HEAP_SIZE);
+}
+
 void test_htree_long_path()
 {
     omhtree tree = { };
@@ -1243,6 +1265,7 @@ static CU_TestInfo tests_htree[] = {
     {"parent", test_htree_parent},
     {"key", test_htree_key},
     {"children", test_htree_children},
+    {"children root", test_htree_children_root},
     {"long path", test_htree_long_path},
     {"add/delete perf", test_htree_add_delete_perf},
     {"path performance", test_htree_path_perf},
